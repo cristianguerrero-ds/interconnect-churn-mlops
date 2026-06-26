@@ -1,12 +1,11 @@
-# Python
+# ==============================================================================
+# Python & Caches
+# ==============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -23,37 +22,52 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE
+# ==============================================================================
+# Virtual Environments (Local Dependencies)
+# ==============================================================================
+.venv/
+env/
+venv/
+ENV/
+
+# ==============================================================================
+# IDEs & Editors
+# ==============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Data & Models
-data/
-models/
-*.pkl
-*.h5
-*.joblib
+# ==============================================================================
+# Interconnect Project: Persistent Data & Logs (EXCLUDING MODEL)
+# ==============================================================================
+# Local SQLite databases (Must be ignored to avoid production write locks)
+*.db
+*.db-journal
 
-# Jupyter
+# Locally exported datasets for retraining loops
+data_reentrenamiento/
+
+# Logs & Notebook checkpoints
+logs/
+*.log
 .ipynb_checkpoints/
-*.ipynb
 
-# Environment
+# Note: 'data/', 'models/', and '*.pkl' were REMOVED from here 
+# so 'modelo_interconnect.pkl' can be safely pushed to GitHub.
+
+# ==============================================================================
+# Environments & OS
+# ==============================================================================
 .env
 .env.local
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Logs
-logs/
-*.log
-
-# MLOps
+# ==============================================================================
+# MLOps & Tracking
+# ==============================================================================
 mlruns/
 .mlflow/
 artifacts/
