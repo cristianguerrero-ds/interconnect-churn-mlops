@@ -43,19 +43,19 @@ The cross-analysis implemented within the pipeline revealed critical churn patte
 ```text
 interconnection-abandonment-mlops/
 │
-├── .streamlit #
-    ├── config.toml # Configuracion de tema
-├── data/ # Original datasets (Contract, Personnel, Internet, Telephone)
-├── data_reentrenamiento # Guardado de datos recolectados para posterior reentrenamiento del modelo
-├── src/ # Modular support code
-│ ├── __init__.py
-│ └── pipeline_config.py # Feature engineering and Scikit-Learn pipeline
-├── generar_test_csv.py # Generador de clientes para pruebas
-├── .venv/ # Virtual dependency environment (Excluded in .gitignore)
-├── app.py # Interactive Streamlit application (Single and Bulk)
-├── train.py # Model unification, cleaning, and training script
-├── modelo_interconnect.pkl
-├── requirements.txt # Libraries and Project dependencies
-└── README.md#Project documentation
-└── .gitignore
-└── notebook # EDA and model formulation prior to production.
+├── .gitignore                         # Excludes environments, local databases, and temporary caches
+├── .streamlit/
+│   └── config.toml                    # Theme customization (Dark & Indigo setup)
+├── README.md                          # Professional project documentation
+├── app.py                             # Interactive Streamlit application (Single & Bulk predictions)
+├── generate_test_csv.py               # Auxiliary script to generate mock customers for bulk testing
+├── modelo_interconnect.pkl            # Trained and serialized production model (Ensure it's generated!)
+├── requirements.txt                   # Production dependencies and library versions
+├── train.py                           # Data preparation, pipeline fitting, and serialization script
+│
+├── data/                              # Raw source datasets (Contract, Personal, Internet, Phone)
+├── data_reentrenamiento/               # Local directory for saving newly collected feedback loops
+├── notebook/                          # Development EDA and prototyping phase
+└── src/                               # Modular application backend
+    ├── __init__.py
+    └── pipeline_config.py             # Feature engineering schemas & Scikit-Learn pipeline definitions
