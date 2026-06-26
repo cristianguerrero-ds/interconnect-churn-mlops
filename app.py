@@ -47,7 +47,7 @@ st.markdown("Plataforma avanzada de MLOps con persistencia de datos, auditoría 
 # 💾 CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 # ==========================================
 def conectar_db():
-    return sqlite3.connect('historial_churn_v4.db')
+    return sqlite3.connect('historial_churn_v1.db')
 
 def inicializar_db():
     conn = conectar_db()

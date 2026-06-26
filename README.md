@@ -43,14 +43,18 @@ The cross-analysis implemented within the pipeline revealed critical churn patte
 ```text
 interconnection-abandonment-mlops/
 │
+├── .streamlit #
+    ├── config.toml # Configuracion de tema
 ├── data/ # Original datasets (Contract, Personnel, Internet, Telephone)
+├── data_reentrenamiento # Guardado de datos recolectados para posterior reentrenamiento del modelo
 ├── src/ # Modular support code
 │ ├── __init__.py
 │ └── pipeline_config.py # Feature engineering and Scikit-Learn pipeline
-│
+├── generar_test_csv.py # Generador de clientes para pruebas
 ├── .venv/ # Virtual dependency environment (Excluded in .gitignore)
 ├── app.py # Interactive Streamlit application (Single and Bulk)
 ├── train.py # Model unification, cleaning, and training script
+├── modelo_interconnect.pkl
 ├── requirements.txt # Libraries and Project dependencies
 └── README.md#Project documentation
 └── .gitignore
