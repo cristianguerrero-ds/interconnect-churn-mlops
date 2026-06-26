@@ -1,0 +1,7 @@
+# .streamlit/config.toml
+[theme]
+primaryColor = "#6366F1"          # Azul Índigo brillante para botones y estados activos
+backgroundColor = "#0F172A"      # Slate oscuro profundo para el fondo principal
+secondaryBackgroundColor = "#1E293B" # Gris slate intermedio para selectores y tablas
+textColor = "#F8FAFC"             # Blanco titanio para máxima legibilidad
+font = "sans serif"
