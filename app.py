@@ -1,4 +1,3 @@
-cat << 'EOF' > app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -301,4 +300,3 @@ with tab4:
         
     else:
         st.info("Registre datos en el sistema para generar métricas estadísticas.")
-EOF
