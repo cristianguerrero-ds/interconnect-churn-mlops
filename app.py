@@ -215,9 +215,7 @@ with tab1:
                     guardar_registros_en_sheets(df_operativo)
                     st.success("📈 Registro actualizado en el histórico.")
 
-
 # ==========================================
-<<<<<<< HEAD
 # TAB 2: CARGA MASIVA DE CLIENTES (CORREGIDO)
 # ==========================================
 with tab2:
@@ -272,56 +270,6 @@ with tab2:
             preds = modelo_produccion.predict(X_masivo)
             probs = modelo_produccion.predict_proba(X_masivo)[:, 1]
             
-=======
-# TAB 2: CARGA MASIVA
-# ==========================================
-with tab2:
-    st.subheader("📂 Procesamiento por Lotes")
-    archivo_subido = st.file_uploader("Seleccione el archivo CSV de clientes", type=["csv"], key="masivo_uploader")
-    if archivo_subido is not None:
-        df_usuarios = pd.read_csv(archivo_subido)
-        with st.spinner("Procesando Base de Datos..."):
-            X_masivo = df_usuarios.drop(columns=['customer_id', 'Prediccion_Churn', 'Probabilidad_Abandono', 'Estatus_Riesgo', 'nombre', 'telefono'], errors='ignore')
-            preds = modelo_produccion.predict(X_masivo)
-            probs = modelo_produccion.predict_proba(X_masivo)[:, 1] if hasattr(modelo_produccion, 'predict_proba') else np.zeros(len(X_masivo))
-
-            lote_nuevos = []
-            for idx, row in df_usuarios.iterrows():
-                prop_masiva = "Ofrecer descuento de retención." if preds[idx] == 1 else "Monitoreo estándar."
-                lote_nuevos.append({
-                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "nombre": row.get('nombre', 'Carga Masiva'),
-                    "identificador": row.get('customer_id', 'N/D'),
-                    "telefono": row.get('telefono', 'Sin Teléfono'),
-                    "genero": row.get('gender','male'),
-                    "jubilado": str(row.get('senior_citizen',0)),
-                    "pareja": row.get('partner','no'),
-                    "dependientes": row.get('dependents','no'),
-                    "antiguedad": float(row.get('months_of_age', 0)),
-                    "internet": row.get('internet_service', 'no_contract'),
-                    "seguridad": row.get('online_security', 'N/D'),
-                    "backup": row.get('online_backup', 'N/D'),
-                    "proteccion": row.get('device_protection', 'N/D'),
-                    "soporte": row.get('tech_support', 'N/D'),
-                    "telefonia": row.get('multiple_lines', 'no'),
-                    "streaming_tv": row.get('streaming_tv', 'N/D'),
-                    "streaming_movies": row.get('streaming_movies', 'N/D'),
-                    "contrato": row.get('type', 'month-to-month'),
-                    "factura_electronica": row.get('paperless_billing', 'N/D'),
-                    "metodo_pago": row.get('payment_method', 'N/D'),
-                    "cargo_mensual": float(row.get('monthly_charges', 0.0)),
-                    "cargo_total": float(row.get('total_charges', 0.0)),
-                    "prediccion": "Riesgo Alto" if preds[idx] == 1 else "Estable",
-                    "probabilidad": float(probs[idx]) if len(probs) > idx else 0.0,
-                    "propuesta_comercial": prop_masiva,
-                    "venta_cerrada": "Pendiente"
-                })
-
-            guardar_registros_en_sheets(pd.DataFrame(lote_nuevos))
-            st.success(f"📊 Se procesaron y guardaron {len(df_usuarios)} registros en el histórico.")
-
-
->>>>>>> 59852f4040d32cb1f11fab0670915b7c88d7ce0c
 # ==========================================
 # TAB 3: HISTORIAL
 # ==========================================
