@@ -324,53 +324,102 @@ with tab2:
             st.dataframe(df_lote[['identificador', 'nombre', 'cargo_mensual', 'prediccion', 'probabilidad']].head())
 
 # ==========================================
-# TAB 3: HISTORIAL
+# TAB 3: HISTORIAL & OPERACIONES CRUD
 # ==========================================
 with tab3:
-    st.subheader("📜 Historial de Auditoría Comercial (Local/Sheets)")
-    df_historial = inicializar_or_obtener_datos()
+    st.subheader("📜 Historial de Auditoría e Interfaz de Modificación")
+    df_crud = inicializar_or_obtener_datos()
 
-    if not df_historial.empty:
-        df_historial = df_historial.iloc[::-1].reset_index(drop=True)
-        csv_data = df_historial.to_csv(index=False).encode('utf-8-sig')
-        c_descarga, c_borrado = st.columns([1, 1])
-        with c_descarga:
-            st.download_button("📥 Descargar Dataset Manual (CSV)", data=csv_data, file_name="dataset_churn_sheets.csv", mime="text/csv")
+    if not df_crud.empty:
+        # --- SECCIÓN DE BÚSQUEDA Y OPERACIONES (CRUD) ---
+        st.markdown("### 🛠️ Buscar, Actualizar o Eliminar Clientes")
+        
+        c_busqueda, c_criterio = st.columns([2, 1])
+        with c_criterio:
+            tipo_busqueda = st.selectbox("Buscar por:", ["Nombre", "Identificador Único (ID Cliente)", "ID de Registro Interno"])
+        with c_busqueda:
+            query_busqueda = st.text_input("Ingrese el término de búsqueda:")
 
-        df_vista = df_historial.copy()
-        df_vista['probabilidad'] = pd.to_numeric(df_vista.get('probabilidad', 0), errors='coerce').map(lambda n: f"{n:.1%}" if not np.isnan(n) else "N/D")
-        st.dataframe(df_vista, use_container_width=True)
+        df_filtrado = pd.DataFrame()
+        if query_busqueda:
+            if tipo_busqueda == "Nombre":
+                df_filtrado = df_crud[df_crud['nombre'].astype(str).str.contains(query_busqueda, case=False, na=False)]
+            elif tipo_busqueda == "Identificador Único (ID Cliente)":
+                df_filtrado = df_crud[df_crud['identificador'].astype(str).str.contains(query_busqueda, case=False, na=False)]
+            else:
+                df_filtrado = df_crud[df_crud['id'].astype(str) == str(query_busqueda)]
 
-        with c_borrado:
-            if st.button("🗑️ Vaciar Historial de Datos"):
-                columnas = ["id", "fecha", "nombre", "identificador", "telefono", "genero", "jubilado", "pareja",
-                            "dependientes", "antiguedad", "internet", "seguridad", "backup", "proteccion", "soporte",
-                            "telefonia", "streaming_tv", "streaming_movies", "contrato", "factura_electronica",
-                            "metodo_pago", "cargo_mensual", "cargo_total", "prediccion", "probabilidad",
-                            "propuesta_comercial", "venta_cerrada"]
-                df_vacio = pd.DataFrame(columns=columnas)
-                if conn_sheets is not None:
-                    try:
-                        conn_sheets.update(data=df_vacio)
-                    except Exception:
-                        pass
-                local_path = os.path.join("data", "historico_sheets.csv")
-                df_vacio.to_csv(local_path, index=False)
-                st.success("Historial vaciado correctamente.")
+        if not df_filtrado.empty:
+            st.write(f"🔍 Se encontraron {len(df_filtrado)} coincidencias:")
+            
+            # Formatear visualización rápida
+            st.dataframe(df_filtrado[['id', 'identificador', 'nombre', 'telefono', 'prediccion', 'venta_cerrada']])
+            
+            # Elegir cuál de las coincidencias modificar si hay más de una
+            seleccion_id = st.selectbox("Seleccione el ID de Registro Interno exacto para Gestionar/Modificar:", options=df_filtrado['id'].tolist())
+            
+            # Obtener el registro a editar
+            registro_exacto = df_crud[df_crud['id'] == str(seleccion_id)].iloc[0]
+            idx_original = df_crud[df_crud['id'] == str(seleccion_id)].index[0]
+            
+            st.markdown("#### Formulario de Edición del Cliente")
+            col_ed1, col_ed2, col_ed3 = st.columns(3)
+            
+            with col_ed1:
+                nuevo_nombre = st.text_input("Nombre", value=str(registro_exacto['nombre']))
+                nuevo_tel = st.text_input("Teléfono", value=str(registro_exacto['telefono']))
+                nuevo_contrato = st.selectbox("Contrato Actual", ["month-to-month", "one_year", "two_year"], index=["month-to-month", "one_year", "two_year"].index(registro_exacto['contrato']) if registro_exacto['contrato'] in ["month-to-month", "one_year", "two_year"] else 0)
+            
+            with col_ed2:
+                nuevo_identificador = st.text_input("ID Cliente", value=str(registro_exacto['identificador']))
+                nuevo_cargo = st.number_input("Cargo Mensual ($)", value=float(registro_exacto['cargo_mensual']))
+                nueva_gestion = st.selectbox("Estatus Gestión Comercial", ["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"], index=["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"].index(registro_exacto['venta_cerrada']) if registro_exacto['venta_cerrada'] in ["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"] else 0)
+
+            with col_ed3:
+                st.markdown("<br><br>", unsafe_allow_html=True)
+                btn_actualizar = st.button("🔄 Guardar Cambios", use_container_width=True)
+                btn_eliminar = st.button("🗑️ Eliminar Cliente del Sistema", use_container_width=True, type="primary")
+
+            if btn_actualizar:
+                df_crud.at[idx_original, 'nombre'] = nuevo_nombre
+                df_crud.at[idx_original, 'telefono'] = nuevo_tel
+                df_crud.at[idx_original, 'contrato'] = nuevo_contrato
+                df_crud.at[idx_original, 'identificador'] = nuevo_identificador
+                df_crud.at[idx_original, 'cargo_mensual'] = nuevo_cargo
+                df_crud.at[idx_original, 'venta_cerrada'] = nueva_gestion
+                
+                actualizar_fuente_datos(df_crud)
+                st.success("✨ ¡Información actualizada con éxito en la base de datos!")
                 st.rerun()
+
+            if btn_eliminar:
+                df_crud = df_crud.drop(idx_original).reset_index(drop=True)
+                actualizar_fuente_datos(df_crud)
+                st.warning("❌ El registro ha sido eliminado del sistema de manera definitiva.")
+                st.rerun()
+        elif query_busqueda:
+            st.error("⚠️ No se encontraron clientes con los criterios especificados.")
+
+        st.markdown("---")
+        st.markdown("### 📋 Vista General del Historial Completo")
+        df_vista = df_crud.copy().iloc[::-1]
+        st.dataframe(df_vista, use_container_width=True)
     else:
         st.info("No se registran consultas guardadas en el histórico.")
-
+        
 
 # ==========================================
-# TAB 4: ESTADÍSTICAS
+# TAB 4: ESTADÍSTICAS & DASHBOARDS
 # ==========================================
+
 with tab4:
     st.subheader("📈 Cuadro de Mando Operativo & KPIs (Real-Time)")
     df_stats = inicializar_or_obtener_datos()
 
     if not df_stats.empty:
+        # Sanitizar columnas numéricas cruciales
         df_stats['cargo_mensual'] = pd.to_numeric(df_stats.get('cargo_mensual', 0), errors='coerce').fillna(0.0)
+        df_stats['antiguedad'] = pd.to_numeric(df_stats.get('antiguedad', 0), errors='coerce').fillna(0.0)
 
         total_casos = len(df_stats)
         riesgo_alto = len(df_stats[df_stats.get('prediccion') == "Riesgo Alto"]) if 'prediccion' in df_stats.columns else 0
@@ -379,6 +428,7 @@ with tab4:
         ventas_exitosas = len(df_stats[df_stats.get('venta_cerrada') == "Contrató Servicio ✔️"]) if 'venta_cerrada' in df_stats.columns else 0
         tasa_conversion = (ventas_exitosas / total_casos) if total_casos > 0 else 0
 
+        # Fila 1: KPIs Principales
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             st.metric("Total Consultas", value=f"{total_casos} u.")
@@ -390,5 +440,49 @@ with tab4:
             st.metric("Conversión Comercial", value=f"{tasa_conversion:.1%}", delta=f"{ventas_exitosas} Ganadas")
 
         st.markdown("---")
+        
+        # Fila 2: Distribución de Riesgo e Impacto por Tipo de Contrato
+        g1, g2 = st.columns(2)
+        
+        with g1:
+            st.write("🎯 **Volumen de Clientes por Estado de Riesgo**")
+            if 'prediccion' in df_stats.columns:
+                df_counts = df_stats['prediccion'].value_counts().to_frame()
+                st.bar_chart(df_counts, color="#FF4B4B")
+            else:
+                st.info("Faltan datos de predicciones.")
+                
+        with g2:
+            st.write("💳 **Pérdida de Cartera Mensual por Tipo de Contrato**")
+            if 'contrato' in df_stats.columns and 'prediccion' in df_stats.columns:
+                df_fuga_contrato = df_stats[df_stats['prediccion'] == "Riesgo Alto"].groupby('contrato')['cargo_mensual'].sum()
+                st.bar_chart(df_fuga_contrato, color="#29B5E8")
+            else:
+                st.info("Faltan datos de contratos para evaluar la fuga.")
+
+        st.markdown("---")
+        
+        # Fila 3: Tendencia Temporal e Impacto del Tipo de Internet
+        g3, g4 = st.columns(2)
+        
+        with g3:
+            st.write("📅 **Evolución del Cargo Mensual Registrado**")
+            if 'fecha' in df_stats.columns:
+                # Agrupar por fecha limpia (Y-m-d) para ver el comportamiento
+                df_stats['fecha_dia'] = df_stats['fecha'].str.slice(0, 10)
+                df_linea = df_stats.groupby('fecha_dia')['cargo_mensual'].mean()
+                st.area_chart(df_linea, color="#77933C")
+            else:
+                st.info("Falta columna de fecha temporal.")
+                
+        with g4:
+            st.write("🌐 **Estado de Riesgo según Tipo de Conectividad**")
+            if 'internet' in df_stats.columns and 'prediccion' in df_stats.columns:
+                # Crear tabla cruzada para ver el riesgo según el internet
+                df_pivot = pd.crosstab(df_stats['internet'], df_stats['prediccion'])
+                st.bar_chart(df_pivot)
+            else:
+                st.info("Faltan variables de internet para segmentar.")
+                
     else:
-        st.info("No hay datos disponibles para KPIs.")
+        st.info("No hay datos disponibles en el histórico para estructurar los Dashboards.")
