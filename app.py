@@ -291,68 +291,60 @@ with tab1:
                 st.success("📈 Registro actualizado. Información lista para futuros reentrenamientos.")
 
 # ==========================================
-# TAB 2: CARGA MASIVA DE CLIENTES
+# TAB 2: CARGA MASIVA DE CLIENTES (CORREGIDO)
 # ==========================================
 with tab2:
-    st.subheader("📂 Procesamiento por Lotes")
-    st.markdown("Cargue archivos CSV masivos para auditar bases de datos operativas completas.")
-    archivo_subido = st.file_uploader("Seleccione el archivo CSV de clientes", type=["csv"], key="masivo_uploader")
+    st.subheader("📂 Procesamiento Masivo por Lotes")
+    st.markdown("Cargue archivos estructurados en formato CSV para procesar预测 y auditorías en bloque.")
+    archivo_subido = st.file_uploader("Seleccione el archivo CSV con los datos de clientes:", type=["csv"], key="batch_file_uploader")
     
     if archivo_subido is not None:
         df_usuarios = pd.read_csv(archivo_subido)
-        with st.spinner("Procesando Base de Datos..."):
-            costo_internet = np.select([df_usuarios['internet_service'] == 'Fiber optic', df_usuarios['internet_service'] == 'DSL'], [75.0, 45.0], default=0.0)
-            servicios = ['online_security', 'online_backup', 'device_protection', 'tech_support', 'streaming_tv', 'streaming_movies']
-            conteo_servicios = df_usuarios[servicios].apply(lambda row: sum(1 for s in row if s == 'yes'), axis=1)
-            costo_telefono = np.select([df_usuarios['multiple_lines'] == 'yes', df_usuarios['multiple_lines'] == 'no'], [30.0, 20.0], default=0.0)
-            tarifa_mensual = costo_internet + (conteo_servicios * 5.5) + costo_telefono
-            df_usuarios['monthly_charges'] = np.where((df_usuarios['internet_service'] == 'no_contract') & (df_usuarios['multiple_lines'] == 'no_contract'), 0.0, tarifa_mensual)
-            df_usuarios['total_charges'] = df_usuarios['monthly_charges'] * df_usuarios['months_of_age']
-            df_usuarios['month_registration'] = 6
-            df_usuarios['quarter_registration'] = 2
+        with st.spinner("Procesando datos y ejecutando inferencia en lote..."):
             
-            X_masivo = df_usuarios.drop(columns=['customer_id', 'Prediccion_Churn', 'Probabilidad_Abandono', 'Estatus_Riesgo', 'nombre'], errors='ignore')
+            # 1. Crear una copia limpia para la inferencia del modelo
+            X_masivo = df_usuarios.copy()
+            
+            # 2. Remover columnas de identificación que NO van al modelo
+            columnas_no_features = ['customer_id', 'Prediccion_Churn', 'Probabilidad_Abandono', 'Estatus_Riesgo', 'nombre', 'telefono']
+            X_masivo = X_masivo.drop(columns=columnas_no_features, errors='ignore')
+            
+            # 3. Lista maestra de columnas EXACTAS que exige tu Pipeline de Scikit-Learn
+            # (Asegúrate de que coincidan con las de tu train.py)
+            columnas_requeridas = [
+                'type', 'paperless_billing', 'payment_method', 'monthly_charges', 'total_charges', 
+                'gender', 'senior_citizen', 'partner', 'dependents', 'internet_service', 
+                'online_security', 'online_backup', 'device_protection', 'tech_support', 
+                'streaming_tv', 'streaming_movies', 'multiple_lines', 'months_of_age', 
+                'month_registration', 'quarter_registration'
+            ]
+            
+            # 4. Inyección defensiva: Si falta alguna columna en el CSV, la creamos con un valor neutro
+            valores_defecto = {
+                'type': 'month_to_month', 'paperless_billing': 'no', 'payment_method': 'electronic_check',
+                'monthly_charges': 50.0, 'total_charges': 50.0, 'gender': 'male', 'senior_citizen': 0,
+                'partner': 'no', 'dependents': 'no', 'internet_service': 'fiber_optic',
+                'online_security': 'no', 'online_backup': 'no', 'device_protection': 'no',
+                'tech_support': 'no', 'streaming_tv': 'no', 'streaming_movies': 'no',
+                'multiple_lines': 'no', 'months_of_age': 12, 'month_registration': 6, 'quarter_registration': 2
+            }
+            
+            for col in columnas_requeridas:
+                if col not in X_masivo.columns:
+                    X_masivo[col] = valores_defecto[col]
+            
+            # 5. Forzar el cálculo de cargos totales si faltan o son nulos
+            X_masivo['monthly_charges'] = pd.to_numeric(X_masivo['monthly_charges'], errors='coerce').fillna(55.0)
+            X_masivo['months_of_age'] = pd.to_numeric(X_masivo['months_of_age'], errors='coerce').fillna(12)
+            X_masivo['total_charges'] = X_masivo['total_charges'].fillna(X_masivo['monthly_charges'] * X_masivo['months_of_age'])
+            
+            # 6. REORDENAR ESTRICTO: El orden de las columnas debe ser idéntico al de entrenamiento
+            X_masivo = X_masivo[columnas_requeridas]
+            
+            # 7. Ejecutar predicción sin riesgo de desalineación
             preds = modelo_produccion.predict(X_masivo)
             probs = modelo_produccion.predict_proba(X_masivo)[:, 1]
             
-            conn = conectar_db()
-            for idx, row in df_usuarios.iterrows():
-                prop_masiva = "Ofrecer descuento de retención." if preds[idx] == 1 else "Monitoreo estándar."
-                nom_masivo = row.get('nombre', 'Carga Masiva')
-                id_masivo = row.get('customer_id', 'N/D')
-                tel_masivo = row.get('telefono', 'Sin Teléfono') # Captura columna si existe en el CSV
-                
-                conn.cursor().execute('''
-                    INSERT INTO consultas (fecha, nombre, identificador, telefono, genero, jubilado, pareja, dependientes, antiguedad, internet, seguridad, backup, proteccion, soporte, telefonia, streaming_tv, streaming_movies, contrato, factura_electronica, metodo_pago, cargo_mensual, cargo_total, prediccion, probabilidad, propuesta_comercial, venta_cerrada)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
-                ''', (
-                    datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                    str(nom_masivo), 
-                    str(id_masivo), 
-                    str(tel_masivo),  # 👈 ¡Listo! Agregado en su posición correcta
-                    row.get('gender','male'), 
-                    str(row.get('senior_citizen',0)), 
-                    row.get('partner','no'), 
-                    row.get('dependents','no'), 
-                    float(row['months_of_age']), 
-                    row['internet_service'], 
-                    'N/D', 'N/D', 'N/D', 'N/D', 
-                    row['multiple_lines'], 
-                    'N/D', 'N/D', 
-                    row['type'], 
-                    'N/D', 
-                    row['payment_method'], 
-                    float(row['monthly_charges']), 
-                    float(row['total_charges']), 
-                    "Riesgo Alto" if preds[idx] == 1 else "Estable", 
-                    float(probs[idx]), 
-                    prop_masiva
-                ))
-            conn.commit()
-            conn.close()
-            
-            st.success(f"📊 Se procesaron y guardaron {len(df_usuarios)} registros en el historial.")
-
 # ==========================================
 # TAB 3: HISTORIAL DE PERSONAS CONSULTADAS
 # ==========================================
