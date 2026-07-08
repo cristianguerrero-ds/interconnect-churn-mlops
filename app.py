@@ -103,11 +103,14 @@ if modelo_produccion is None:
 
 
 # ==========================================
-# TAB 1: CONSULTA INDIVIDUAL (Sección de Guardado)
+# DEFINICIÓN DE TABS
 # ==========================================
 tabs = st.tabs(["Consulta Individual", "Carga Masiva", "Historial", "Estadísticas"])
 tab1, tab2, tab3, tab4 = tabs
 
+# ==========================================
+# TAB 1: CONSULTA INDIVIDUAL
+# ==========================================
 with tab1:
     st.subheader("🔎 Consulta Individual")
     name_ui = st.text_input("Nombre del Cliente")
@@ -160,7 +163,7 @@ with tab1:
         prediccion = int(modelo_produccion.predict(df_input)[0])
         probabilidad = float(modelo_produccion.predict_proba(df_input)[0][1]) if hasattr(modelo_produccion, 'predict_proba') else 0.0
 
-        propuesta = "Mantener monitoreo estándar."
+        propuesta = "Ofrecer plan de retención comercial" if prediccion == 1 else "Mantener monitoreo estándar."
 
         nueva_consulta = pd.DataFrame([{
             "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -212,30 +215,38 @@ with tab1:
                 idx_target = df_operativo[df_operativo["id"].astype(str) == str(st.session_state['id_actual'])].index
                 if not idx_target.empty:
                     df_operativo.loc[idx_target, "venta_cerrada"] = resultado_gestion
-                    guardar_registros_en_sheets(df_operativo)
+                    
+                    # Para sobreescribir la base completa modificada en vez de duplicar registros
+                    if conn_sheets is not None:
+                        try:
+                            conn_sheets.update(data=df_operativo)
+                        except Exception:
+                            pass
+                    local_path = os.path.join("data", "historico_sheets.csv")
+                    df_operativo.to_csv(local_path, index=False)
                     st.success("📈 Registro actualizado en el histórico.")
 
 # ==========================================
-# TAB 2: CARGA MASIVA DE CLIENTES (CORREGIDO)
+# TAB 2: CARGA MASIVA DE CLIENTES
 # ==========================================
 with tab2:
     st.subheader("📂 Procesamiento Masivo por Lotes")
-    st.markdown("Cargue archivos estructurados en formato CSV para procesar预测 y auditorías en bloque.")
+    st.markdown("Cargue archivos estructurados en formato CSV para procesar predicciones y auditorías en bloque.")
     archivo_subido = st.file_uploader("Seleccione el archivo CSV con los datos de clientes:", type=["csv"], key="batch_file_uploader")
     
     if archivo_subido is not None:
         df_usuarios = pd.read_csv(archivo_subido)
+        
         with st.spinner("Procesando datos y ejecutando inferencia en lote..."):
-            
-            # 1. Crear una copia limpia para la inferencia del modelo
+            # 1. Copia limpia y normalización de nombres de columnas del CSV subido
             X_masivo = df_usuarios.copy()
+            X_masivo.columns = X_masivo.columns.str.lower().str.replace(' ', '_').str.strip()
             
-            # 2. Remover columnas de identificación que NO van al modelo
-            columnas_no_features = ['customer_id', 'Prediccion_Churn', 'Probabilidad_Abandono', 'Estatus_Riesgo', 'nombre', 'telefono']
+            # 2. Remover columnas de metadata comercial que no procesa el modelo matemático
+            columnas_no_features = ['customer_id', 'prediccion_churn', 'probabilidad_abandono', 'estatus_riesgo', 'nombre', 'telefono', 'id', 'fecha', 'venta_cerrada', 'propuesta_comercial']
             X_masivo = X_masivo.drop(columns=columnas_no_features, errors='ignore')
             
-            # 3. Lista maestra de columnas EXACTAS que exige tu Pipeline de Scikit-Learn
-            # (Asegúrate de que coincidan con las de tu train.py)
+            # 3. Mapeo estricto exigido por tu Pipeline de Scikit-Learn
             columnas_requeridas = [
                 'type', 'paperless_billing', 'payment_method', 'monthly_charges', 'total_charges', 
                 'gender', 'senior_citizen', 'partner', 'dependents', 'internet_service', 
@@ -244,9 +255,9 @@ with tab2:
                 'month_registration', 'quarter_registration'
             ]
             
-            # 4. Inyección defensiva: Si falta alguna columna en el CSV, la creamos con un valor neutro
+            # 4. Inyección de valores neutros en caso de que falte alguna columna en el archivo externo
             valores_defecto = {
-                'type': 'month_to_month', 'paperless_billing': 'no', 'payment_method': 'electronic_check',
+                'type': 'month-to-month', 'paperless_billing': 'no', 'payment_method': 'electronic_check',
                 'monthly_charges': 50.0, 'total_charges': 50.0, 'gender': 'male', 'senior_citizen': 0,
                 'partner': 'no', 'dependents': 'no', 'internet_service': 'fiber_optic',
                 'online_security': 'no', 'online_backup': 'no', 'device_protection': 'no',
@@ -258,18 +269,60 @@ with tab2:
                 if col not in X_masivo.columns:
                     X_masivo[col] = valores_defecto[col]
             
-            # 5. Forzar el cálculo de cargos totales si faltan o son nulos
-            X_masivo['monthly_charges'] = pd.to_numeric(X_masivo['monthly_charges'], errors='coerce').fillna(55.0)
-            X_masivo['months_of_age'] = pd.to_numeric(X_masivo['months_of_age'], errors='coerce').fillna(12)
+            # 5. Sanitizar y limpiar tipos de datos numéricos provenientes del archivo cargado
+            X_masivo['monthly_charges'] = pd.to_numeric(X_masivo['monthly_charges'], errors='coerce').fillna(valores_defecto['monthly_charges'])
+            X_masivo['months_of_age'] = pd.to_numeric(X_masivo['months_of_age'], errors='coerce').fillna(valores_defecto['months_of_age'])
+            X_masivo['total_charges'] = pd.to_numeric(X_masivo['total_charges'], errors='coerce')
             X_masivo['total_charges'] = X_masivo['total_charges'].fillna(X_masivo['monthly_charges'] * X_masivo['months_of_age'])
             
-            # 6. REORDENAR ESTRICTO: El orden de las columnas debe ser idéntico al de entrenamiento
+            # 6. Reordenación estructural final
             X_masivo = X_masivo[columnas_requeridas]
             
-            # 7. Ejecutar predicción sin riesgo de desalineación
+            # 7. Inferencia matemática
             preds = modelo_produccion.predict(X_masivo)
-            probs = modelo_produccion.predict_proba(X_masivo)[:, 1]
+            probs = modelo_produccion.predict_proba(X_masivo)[:, 1] if hasattr(modelo_produccion, 'predict_proba') else np.zeros(len(X_masivo))
             
+            # 8. Mapear y preparar estructura para el histórico (Google Sheets o Local fallback)
+            df_lote = pd.DataFrame()
+            df_lote['fecha'] = [datetime.now().strftime("%Y-%m-%d %H:%M")] * len(df_usuarios)
+            
+            # Columnas comerciales opcionales del archivo cargado
+            df_usuarios.columns = df_usuarios.columns.str.lower().str.replace(' ', '_').str.strip()
+            df_lote['nombre'] = df_usuarios['nombre'] if 'nombre' in df_usuarios.columns else df_usuarios['customer_id'] if 'customer_id' in df_usuarios.columns else "Cliente_Masivo"
+            df_lote['identificador'] = df_usuarios['customer_id'] if 'customer_id' in df_usuarios.columns else df_usuarios['identificador'] if 'identificador' in df_usuarios.columns else "N/D"
+            df_lote['telefono'] = df_usuarios['telefono'] if 'telefono' in df_usuarios.columns else "N/D"
+            
+            # Llenado de variables mapeadas correspondientes a las columnas requeridas
+            df_lote['genero'] = X_masivo['gender']
+            df_lote['jubilado'] = X_masivo['senior_citizen'].astype(int)
+            df_lote['pareja'] = X_masivo['partner']
+            df_lote['dependientes'] = X_masivo['dependents']
+            df_lote['antiguedad'] = X_masivo['months_of_age'].astype(float)
+            df_lote['internet'] = X_masivo['internet_service']
+            df_lote['seguridad'] = X_masivo['online_security']
+            df_lote['backup'] = X_masivo['online_backup']
+            df_lote['proteccion'] = X_masivo['device_protection']
+            df_lote['soporte'] = X_masivo['tech_support']
+            df_lote['telefonia'] = X_masivo['multiple_lines']
+            df_lote['streaming_tv'] = X_masivo['streaming_tv']
+            df_lote['streaming_movies'] = X_masivo['streaming_movies']
+            df_lote['contrato'] = X_masivo['type']
+            df_lote['factura_electronica'] = X_masivo['paperless_billing']
+            df_lote['metodo_pago'] = X_masivo['payment_method']
+            df_lote['cargo_mensual'] = X_masivo['monthly_charges'].astype(float)
+            df_lote['cargo_total'] = X_masivo['total_charges'].astype(float)
+            
+            # Resultados del Modelo
+            df_lote['prediccion'] = ["Riesgo Alto" if p == 1 else "Estable" for p in preds]
+            df_lote['probabilidad'] = probs.astype(float)
+            df_lote['propuesta_comercial'] = ["Ofrecer plan de retención comercial" if p == 1 else "Mantener monitoreo estándar." for p in preds]
+            df_lote['venta_cerrada'] = ["Pendiente"] * len(df_usuarios)
+            
+            # Guardar registros procesados
+            guardar_registros_en_sheets(df_lote)
+            st.success(f"🎉 ¡Inferencia exitosa! Se han procesado y guardado {len(df_lote)} registros en el historial.")
+            st.dataframe(df_lote[['identificador', 'nombre', 'cargo_mensual', 'prediccion', 'probabilidad']].head())
+
 # ==========================================
 # TAB 3: HISTORIAL
 # ==========================================
@@ -290,10 +343,21 @@ with tab3:
 
         with c_borrado:
             if st.button("🗑️ Vaciar Historial de Datos"):
-                columnas = list(df_historial.columns)
+                columnas = ["id", "fecha", "nombre", "identificador", "telefono", "genero", "jubilado", "pareja",
+                            "dependientes", "antiguedad", "internet", "seguridad", "backup", "proteccion", "soporte",
+                            "telefonia", "streaming_tv", "streaming_movies", "contrato", "factura_electronica",
+                            "metodo_pago", "cargo_mensual", "cargo_total", "prediccion", "probabilidad",
+                            "propuesta_comercial", "venta_cerrada"]
                 df_vacio = pd.DataFrame(columns=columnas)
-                guardar_registros_en_sheets(df_vacio)
-                st.experimental_rerun()
+                if conn_sheets is not None:
+                    try:
+                        conn_sheets.update(data=df_vacio)
+                    except Exception:
+                        pass
+                local_path = os.path.join("data", "historico_sheets.csv")
+                df_vacio.to_csv(local_path, index=False)
+                st.success("Historial vaciado correctamente.")
+                st.rerun()
     else:
         st.info("No se registran consultas guardadas en el histórico.")
 
