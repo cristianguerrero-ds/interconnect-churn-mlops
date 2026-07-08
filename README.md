@@ -1,6 +1,4 @@
 
-
-```markdown
 # 📊 Interconnect Churn Predictor v3 — MLOps Platform
 
 Plataforma analítica e interactiva de MLOps para la predicción, gestión y auditoría en tiempo real del riesgo de deserción de clientes (*Churn*) en servicios de telecomunicaciones.
