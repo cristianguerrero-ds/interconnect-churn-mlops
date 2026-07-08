@@ -18,9 +18,9 @@ tipos_contrato = ["month_to_month", "one_year", "two_year"]
 metodos_pago = ["electronic_check", "mailed_check", "bank_transfer_automatic", "credit_card_automatic"]
 opciones_si_no = ["yes", "no"]
 
-datos_20_clientes = []
+datos_40_clientes = []
 
-for i in range(20):
+for i in range(40):
     # Generar un ID con el formato real de Interconnect (ej. 1234-ABCD)
     customer_id = f"{random.randint(1000, 9999)}-{chr(random.randint(65, 90))}{chr(random.randint(65, 90))}{chr(random.randint(65, 90))}{chr(random.randint(65, 90))}"
     
@@ -51,7 +51,7 @@ for i in range(20):
 
     registro = {
         "customer_id": customer_id,
-        "nombre": nombres_ficticios[i],
+        "nombre": random.choice(nombres_ficticios),
         "telefono": telefono,
         "gender": random.choice(["male", "female"]),
         "senior_citizen": random.choice([0, 1]),
@@ -70,10 +70,10 @@ for i in range(20):
         "paperless_billing": random.choice(opciones_si_no),
         "payment_method": random.choice(metodos_pago)
     }
-    datos_20_clientes.append(registro)
+    datos_40_clientes.append(registro)
 
 # Crear DataFrame y exportar a CSV
-df_test = pd.DataFrame(datos_20_clientes)
-df_test.to_csv("clientes_prueba.csv", index=False)
+df_test = pd.DataFrame(datos_40_clientes)
+df_test.to_csv("clientes_prueba_2.csv", index=False)
 
-print("✅ Archivo 'clientes_prueba.csv' generado con éxito con 20 registros.")
+print("✅ Archivo 'clientes_prueba_2.csv' generado con éxito con 40 registros.")
