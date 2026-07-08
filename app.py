@@ -324,14 +324,13 @@ with tab2:
             st.dataframe(df_lote[['identificador', 'nombre', 'cargo_mensual', 'prediccion', 'probabilidad']].head())
 
 # ==========================================
-# TAB 3: HISTORIAL & OPERACIONES CRUD
+# TAB 3: HISTORIAL & OPERACIONES CRUD (CORREGIDO)
 # ==========================================
 with tab3:
     st.subheader("📜 Historial de Auditoría e Interfaz de Modificación")
     df_crud = inicializar_or_obtener_datos()
 
     if not df_crud.empty:
-        # --- SECCIÓN DE BÚSQUEDA Y OPERACIONES (CRUD) ---
         st.markdown("### 🛠️ Buscar, Actualizar o Eliminar Clientes")
         
         c_busqueda, c_criterio = st.columns([2, 1])
@@ -351,63 +350,75 @@ with tab3:
 
         if not df_filtrado.empty:
             st.write(f"🔍 Se encontraron {len(df_filtrado)} coincidencias:")
-            
-            # Formatear visualización rápida
             st.dataframe(df_filtrado[['id', 'identificador', 'nombre', 'telefono', 'prediccion', 'venta_cerrada']])
             
-            # Elegir cuál de las coincidencias modificar si hay más de una
-            seleccion_id = st.selectbox("Seleccione el ID de Registro Interno exacto para Gestionar/Modificar:", options=df_filtrado['id'].tolist())
+            # Añadimos un key único para congelar el estado interno durante el renderizado dinámico
+            seleccion_id = st.selectbox(
+                "Seleccione el ID de Registro Interno exacto para Gestionar/Modificar:", 
+                options=df_filtrado['id'].tolist(),
+                key="crud_select_user"
+            )
             
-            # Obtener el registro a editar
-            registro_exacto = df_crud[df_crud['id'] == str(seleccion_id)].iloc[0]
-            idx_original = df_crud[df_crud['id'] == str(seleccion_id)].index[0]
+            # --- LA SOLUCIÓN AL BUG ---
+            # Extraemos el DataFrame final que coincide exactamente con el ID seleccionado
+            df_registro = df_crud[df_crud['id'] == str(seleccion_id)]
             
-            st.markdown("#### Formulario de Edición del Cliente")
-            col_ed1, col_ed2, col_ed3 = st.columns(3)
-            
-            with col_ed1:
-                nuevo_nombre = st.text_input("Nombre", value=str(registro_exacto['nombre']))
-                nuevo_tel = st.text_input("Teléfono", value=str(registro_exacto['telefono']))
-                nuevo_contrato = st.selectbox("Contrato Actual", ["month-to-month", "one_year", "two_year"], index=["month-to-month", "one_year", "two_year"].index(registro_exacto['contrato']) if registro_exacto['contrato'] in ["month-to-month", "one_year", "two_year"] else 0)
-            
-            with col_ed2:
-                nuevo_identificador = st.text_input("ID Cliente", value=str(registro_exacto['identificador']))
-                nuevo_cargo = st.number_input("Cargo Mensual ($)", value=float(registro_exacto['cargo_mensual']))
-                nueva_gestion = st.selectbox("Estatus Gestión Comercial", ["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"], index=["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"].index(registro_exacto['venta_cerrada']) if registro_exacto['venta_cerrada'] in ["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"] else 0)
-
-            with col_ed3:
-                st.markdown("<br><br>", unsafe_allow_html=True)
-                btn_actualizar = st.button("🔄 Guardar Cambios", use_container_width=True)
-                btn_eliminar = st.button("🗑️ Eliminar Cliente del Sistema", use_container_width=True, type="primary")
-
-            if btn_actualizar:
-                df_crud.at[idx_original, 'nombre'] = nuevo_nombre
-                df_crud.at[idx_original, 'telefono'] = nuevo_tel
-                df_crud.at[idx_original, 'contrato'] = nuevo_contrato
-                df_crud.at[idx_original, 'identificador'] = nuevo_identificador
-                df_crud.at[idx_original, 'cargo_mensual'] = nuevo_cargo
-                df_crud.at[idx_original, 'venta_cerrada'] = nueva_gestion
+            # Validamos estrictamente si el DataFrame tiene contenido antes de aplicar .iloc[0]
+            if not df_registro.empty:
+                registro_exacto = df_registro.iloc[0]
+                idx_original = df_registro.index[0]
                 
-                actualizar_fuente_datos(df_crud)
-                st.success("✨ ¡Información actualizada con éxito en la base de datos!")
-                st.rerun()
+                st.markdown("#### Formulario de Edición del Cliente")
+                col_ed1, col_ed2, col_ed3 = st.columns(3)
+                
+                with col_ed1:
+                    nuevo_nombre = st.text_input("Nombre", value=str(registro_exacto['nombre']))
+                    nuevo_tel = st.text_input("Teléfono", value=str(registro_exacto['telefono']))
+                    # Control de seguridad por si el contrato actual no coincide con las opciones por defecto
+                    idx_contrato = ["month-to-month", "one_year", "two_year"].index(registro_exacto['contrato']) if registro_exacto['contrato'] in ["month-to-month", "one_year", "two_year"] else 0
+                    nuevo_contrato = st.selectbox("Contrato Actual", ["month-to-month", "one_year", "two_year"], index=idx_contrato)
+                
+                with col_ed2:
+                    nuevo_identificador = st.text_input("ID Cliente", value=str(registro_exacto['identificador']))
+                    nuevo_cargo = st.number_input("Cargo Mensual ($)", value=float(registro_exacto['cargo_mensual']))
+                    idx_gestion = ["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"].index(registro_exacto['venta_cerrada']) if registro_exacto['venta_cerrada'] in ["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"] else 0
+                    nueva_gestion = st.selectbox("Estatus Gestión Comercial", ["Pendiente", "Contrató Servicio ✔️", "No Aceptó ❌"], index=idx_gestion)
 
-            if btn_eliminar:
-                df_crud = df_crud.drop(idx_original).reset_index(drop=True)
-                actualizar_fuente_datos(df_crud)
-                st.warning("❌ El registro ha sido eliminado del sistema de manera definitiva.")
-                st.rerun()
+                with col_ed3:
+                    st.markdown("<br><br>", unsafe_allow_html=True)
+                    btn_actualizar = st.button("🔄 Guardar Cambios", use_container_width=True)
+                    btn_eliminar = st.button("🗑️ Eliminar Cliente del Sistema", use_container_width=True, type="primary")
+
+                if btn_actualizar:
+                    df_crud.at[idx_original, 'nombre'] = nuevo_nombre
+                    df_crud.at[idx_original, 'telefono'] = nuevo_tel
+                    df_crud.at[idx_original, 'contrato'] = nuevo_contrato
+                    df_crud.at[idx_original, 'identificador'] = nuevo_identificador
+                    df_crud.at[idx_original, 'cargo_mensual'] = nuevo_cargo
+                    df_crud.at[idx_original, 'venta_cerrada'] = nueva_gestion
+                    
+                    actualizar_fuente_datos(df_crud)
+                    st.success("✨ ¡Información actualizada con éxito en la base de datos!")
+                    st.rerun()
+
+                if btn_eliminar:
+                    df_crud = df_crud.drop(idx_original).reset_index(drop=True)
+                    actualizar_fuente_datos(df_crud)
+                    st.warning("❌ El registro ha sido eliminado del sistema de manera definitiva.")
+                    st.rerun()
+            else:
+                st.caption("Cargando datos de registro...") # Evita el parpadeo y la caída de la UI
+                
         elif query_busqueda:
             st.error("⚠️ No se encontraron clientes con los criterios especificados.")
 
         st.markdown("---")
-        st.markdown("### 📋 Vista General del Historial Completo")
+        st.markdown("<h3>📋 Vista General del Historial Completo</h3>", unsafe_allow_html=True)
         df_vista = df_crud.copy().iloc[::-1]
         st.dataframe(df_vista, use_container_width=True)
     else:
         st.info("No se registran consultas guardadas en el histórico.")
         
-
 # ==========================================
 # TAB 4: ESTADÍSTICAS & DASHBOARDS
 # ==========================================
