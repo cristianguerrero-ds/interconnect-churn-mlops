@@ -1,6 +1,4 @@
-Aquí tienes una propuesta completa y profesional para tu archivo **`README.md`**. Está redactada con un enfoque MLOps, destacando la arquitectura de datos, el flujo de inferencia en tiempo real, las integraciones comerciales y la gestión del ciclo de vida del modelo.
 
----
 
 ```markdown
 # 📊 Interconnect Churn Predictor v3 — MLOps Platform
@@ -13,6 +11,9 @@ Plataforma analítica e interactiva de MLOps para la predicción, gestión y aud
 
 El **Sistema Analítico de Retención - Interconnect** integra un modelo de Machine Learning entrenado y desplegado en un entorno web interactivo construido con **Streamlit**. La plataforma permite a los equipos de analítica y operaciones comerciales evaluar el riesgo de deserción individual o masivo, activar estrategias de retención personalizadas y auditar los resultados comerciales con persistencia bidireccional en la nube y fallback local.
 
+---
+
+Enlace: [https://cristianguerrero-ds-interconnect-churn-mlops-app-ulibfz.streamlit.app/#procesamiento-masivo-por-lotes]
 ---
 
 ## 🔥 Características Principales
@@ -137,4 +138,3 @@ streamlit run app.py
 
 * **Cristian Guerrero / Científico de Datos:** Portfolio de Proyectos MLOps
 * **Modelo:** Clasificador supervisado optimizado para reducción de tasa de abandono (*Churn*).
-
